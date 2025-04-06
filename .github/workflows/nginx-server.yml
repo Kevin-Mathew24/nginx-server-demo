@@ -1,0 +1,49 @@
+name: Nginx Server Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Build and run Nginx container
+      run: |
+        docker build -t nginx-server-demo .
+        docker run -d -p 8080:80 --name nginx-server nginx-server-demo
+        sleep 5
+    
+    - name: Check if Nginx is running
+      run: |
+        if curl -s http://localhost:8080 | grep -q "Welcome to Nginx Server Demo"; then
+          echo "✅ Nginx server is running correctly"
+        else
+          echo "❌ Nginx server is not running correctly"
+          exit 1
+        fi
+    
+    - name: Upload screenshots as artifacts
+      run: |
+        apt-get update && apt-get install -y firefox firefox-geckodriver
+        mkdir -p screenshots
+        firefox --headless --screenshot screenshots/nginx-screenshot.png http://localhost:8080
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: nginx-screenshots
+        path: screenshots/
+    
+    - name: Stop containers
+      if: always()
+      run: docker stop nginx-server || true
